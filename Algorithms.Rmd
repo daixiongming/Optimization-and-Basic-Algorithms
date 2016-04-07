@@ -1,0 +1,362 @@
+---
+title: "Algorithms"
+author: "Zelos Zhu"
+date: "April 6, 2016"
+output: html_document
+---
+
+
+Coordinate descent is an optimization algorithm. It can be used to find a local minimum of a function. To perform coordinate descent, you perform a line search along one coordinate direction to find the value that minimizes the function in that direction while the other values are held constant. Once the value for that direction is updated, you perform the same operation for the other coordinate directions. This repeats until it has been updated for all coordinate directions, at which point the cycle repeats.
+
+Thus for a function of two variables $f(x,y)$, a simple version of the algorithm can be described as follows:
+
+1) Start with some initial values of $x$ and $y$. This is time 0, so we have $x^{(0)}$ and $y^{(0)}$.
+2) Iterate:
+    1) Update $x^{(t+1)}$ to be the value of $x$ that minimizes $f(x,y = y^{(t)})$
+    2) Update $y^{(t+1)}$ to be the value of $y$ that minimizes $f(x = x^{(t)},y)$
+3) Stop when some convergence criterion has been met.
+
+The "tricky" part of the algorithm is finding the value that minimizes the function along one of the directions. 
+
+## Golden Section Search Method (with Video)
+This unidimensional minimization be done in one of many ways, but for our purposes, we will use the golden section search method.
+
+The premise of how the golden section search works is summarized very nicely in this video from CUBoulderComputing: https://vimeo.com/86277921
+
+I will provide the code for the golden section search method here. This is a modified version of Eric Cai's code (https://chemicalstatistician.wordpress.com). It has been modified so that the locations of x1 and x2 match the CUBoulderComputing video
+
+```{r}
+##### A modifcation of code provided by Eric Cai
+golden = function(f, lower, upper, tolerance = 1e-5)
+{
+   golden.ratio = 2/(sqrt(5) + 1)
+
+   ## Use the golden ratio to find the initial test points
+   x1 <- lower + golden.ratio * (upper - lower)
+   x2 <- upper - golden.ratio * (upper - lower)
+   
+   ## the arrangement of points is:
+   ## lower ----- x2 --- x1 ----- upper
+
+   ### Evaluate the function at the test points
+   f1 <- f(x1)
+   f2 <- f(x2)
+
+   while (abs(upper - lower) > tolerance) {
+        if (f2 > f1) {
+        # the minimum is to the right of x2
+        lower <- x2  # x2 becomes the new lower bound
+        x2 <- x1     # x1 becomes the new x2
+        f2 <- f1     # f(x1) now becomes f(x2)
+        x1 <- lower + golden.ratio * (upper - lower)  
+        f1 <- f(x1)  # calculate new x1 and f(x1)
+        } else {
+        # then the minimum is to the left of x1
+        upper <- x1  # x1 becomes the new upper bound
+        x1 <- x2     # x2 becomes the new x1
+        f1 <- f2
+        x2 <- upper - golden.ratio * (upper - lower)
+        f2 <- f(x2)  # calculate new x2 and f(x2)
+        }
+    }
+    (lower + upper)/2 # the returned value is the midpoint of the bounds
+}
+```
+
+We can thus use the golden search to find the minimizing value of a function. For example, the function $f(x) = (x - 3)^2$ has a minimum value at $x = 3$.
+
+```{r}
+f <- function(x){ (x - 3)^2 }
+golden(f, 0, 10)
+```
+
+
+#Coordinate Descent
+$$g(x,y) = 5 x ^ 2 - 6 x y + 5 y ^ 2$$
+
+```{r}
+#Generate a function, some data, and a contour map
+g <- function(x,y) { 
+    5 * x ^ 2 - 6 * x * y + 5 * y ^ 2
+    }
+x <- seq(-1.5,1.5, len=100)
+y <- seq(-1.5,1.5, len=100)
+z <- outer(x,y,g)
+contour(x,y,z, levels = seq(.5,5,by=.9)) # code to plot contour lines
+x_i <- -1.5
+y_i <- -1.5
+```
+ 
+**Apply the Coordinate Descent**
+ 
+```{r}
+#create unidimensional functions, that will draw from a matrix of values that will continually be edited
+fx<-function(x){
+  g(x,y_i[i])
+}
+fy<-function(y){
+  g(x_i[i+1],y)
+}
+
+#loop for adding values, x first then y, draw the arrows while we do the loop
+for(i in 1:15){
+  x_i[i+1]<-golden(fx,x_i[i],1.5)
+  arrows(x_i[i], y_i[i], x_i[i+1], y_i[i],col="blue",code=2,length=0.15,lty=1,lwd=1.5,angle=30) 
+  y_i[i+1]<-golden(fy,y_i[i],1.5)
+  arrows(x_i[i+1], y_i[i], x_i[i+1], y_i[i+1],col="blue",code=2,length=0.15,lty=1,lwd=1.5,angle=30)
+}
+points(x_i,y_i,pch=19)
+```
+
+#Gradient Descent
+Using the same function, but different starting points
+```{r}
+g <- function(x,y) { 
+    5 * x ^ 2 - 6 * x * y + 5 * y ^ 2
+    }
+x <- seq(-1.5,1.5, len=100)
+y <- seq(-1.5,1.5, len=100)
+z <- outer(x,y,g)
+contour(x,y,z, levels = seq(.5,5,by=.9)) # code to plot contour lines
+x_i <- -0.5
+y_i <- -1.5
+alpha = 0.04
+
+#solve for the gradient and put them into functions
+x_grad<-function(x,y){
+  10*x-6*y
+}
+
+y_grad<-function(x,y){
+  10*y-6*x
+}
+
+#after figuring out how many loops it takes to converge, I set n to that number so my end matrix doesn't have any NA's
+n<-21
+
+#matrices to keep track of the points and gradients at those points
+betamat <- matrix(NA, nrow=n+1, ncol=2)
+betamat[1,1] <- x_i
+betamat[1,2] <- y_i
+betastep <- matrix(NA, nrow=n+1, ncol=2)
+betastep[1,1] <- x_grad(x_i,y_i)
+betastep[1,2] <- y_grad(x_i,y_i)
+
+#for loop to descend along gradient, draws arrows as we go down as I did in Task 1
+for(i in 1:n){
+    b0step <- alpha * x_grad(x_i[i],y_i[i])
+    b1step <- alpha * y_grad(x_i[i],y_i[i])
+    x_i[i+1] <- x_i[i] - b0step
+    y_i[i+1] <- y_i[i] - b1step
+    betamat[i+1,1] <- x_i[i+1]
+    betamat[i+1,2] <- y_i[i+1]
+    arrows(betamat[i+1,1], betamat[i+1,2], betamat[i,1], betamat[i,2], col="blue",code=1,length=0.1,lty=1,lwd=1.5,angle=30)
+    betastep[i+1,1] <- b0step
+    betastep[i+1,2] <- b1step
+    converge_x <- betastep[i,1]-betastep[i+1,1]
+    converge_y <- betastep[i,2]-betastep[i+1,2]
+    if( abs(converge_x) < 0.001 | abs(converge_y) < 0.001) {
+      break
+    }
+}
+points(betamat[,1],betamat[,2],pch=19)
+```
+
+Point converges in about "21 steps".
+
+#K-Means Clustering
+Generate some data from a multivariate normal distribution
+```{r}
+set.seed(2016)
+library(mvtnorm)
+cv <- matrix(c(.8,.4,.4,.8), ncol=2)
+j <- rmvnorm(100, mean = c(3,3), sigma = cv)
+k <- rmvnorm(100, mean = c(5,8), sigma = cv)
+l <- rmvnorm(100, mean = c(8,3), sigma = cv)
+dat <- rbind(j,k,l)
+true_groups <- as.factor(c(rep("j",100),rep("k",100),rep("l",100) ))
+plot(dat, col=true_groups)
+
+means <- rbind(c(4,5), c(5,5), c(6,5)) # matrix of starting means
+groupings = as.factor(rep(1,300))  #initial groupings that you will need to update
+plot(dat, col = groupings)  # initial plot
+points(means, col = as.factor(1:3), pch = 19) # add dots for the means
+```
+
+**The algorithm at practice**
+```{r}
+#create a distance function that returns one of three values, 1 for the black point, 2 for the red point, 3 for the green point
+dist<-function(dat,means){
+  dist1<-sqrt((dat[i,1]-means[1,1])^2+(dat[i,2]-means[1,2])^2)
+  dist2<-sqrt((dat[i,1]-means[2,1])^2+(dat[i,2]-means[2,2])^2)
+  dist3<-sqrt((dat[i,1]-means[3,1])^2+(dat[i,2]-means[3,2])^2)
+  small<-min(c(dist1,dist2,dist3))
+  if (small==dist1)
+  {
+    return(1)
+  }
+  if (small==dist2)
+  {
+    return(2)
+  }
+  if (small==dist3)
+  {
+    return(3)
+  }
+}
+
+for(j in 1:6){
+  cluster<-as.matrix(NA,nrow=300,ncol=1)
+  for(i in 1:300){
+    cluster[i]<-dist(dat,means)
+  }
+    dat2<-cbind(dat,cluster)
+    groups<-as.factor(cluster)
+    plot(dat,col=groups)
+    points(means,col=as.factor(1:3),pch=19,cex=1.5)
+    dat2<-as.data.frame(dat2)
+    meansx<-tapply(dat2$V1,dat2$cluster,FUN=mean)
+    meansy<-tapply(dat2$V2,dat2$cluster,FUN=mean)
+    means<-t(rbind(meansx,meansy))
+}
+#confusion matrix, 1 error and it is the a point near (5.8,6) where it is black in the original but is blatantly closer to the top cluster
+print(table(groups,true_groups))
+```
+The k-means cluster made 1 mistake out of the 300 possible points.
+
+
+#The EM Algorithm
+*Gather some random data*
+```{r}
+set.seed(2016)
+library(mvtnorm)
+cv <- matrix(c(1,.1,.1,1), ncol=2)
+j <- rmvnorm(200, mean = c(3,12), sigma = .5*cv)
+k <- rmvnorm(600, mean = c(8,8), sigma = 4*cv)
+l <- rmvnorm(200, mean = c(12,12), sigma = .5*cv)
+dat <- rbind(j,k,l)
+true_groups <- as.factor(c(rep("j",200),rep("k",600),rep("l",200) ))
+plot(dat)
+```
+
+```{r}
+N <- dim(dat)[1]  # number of data points
+alpha <- c(0.2,0.3,0.5)  # arbitrary starting mixing parameters
+mu <- matrix(  # arbitrary means
+    c(5,8,
+      7,8,
+      9,8),
+    nrow = 3, byrow=TRUE
+)
+sig1 <- matrix(c(1,0,0,1), nrow=2)  # three arbitrary covariance matrices
+sig2 <- matrix(c(1,0,0,1), nrow=2)
+sig3 <- matrix(c(1,0,0,1), nrow=2)
+## write your code here
+
+
+#E-STEP-----evaluate weights/responsibilities
+weights<-matrix(0,nrow=1000,ncol=3)
+weights[1:1000,1]<-(alpha[1]*dmvnorm(dat,mu[1,],sig1)) / (alpha[1]*dmvnorm(dat,mu[1,],sig1) + 
+                                                          alpha[2]*dmvnorm(dat,mu[2,],sig2) + 
+                                                          alpha[3]*dmvnorm(dat,mu[3,],sig3) )
+  
+weights[1:1000,2]<-(alpha[2]*dmvnorm(dat,mu[2,],sig2)) / (alpha[1]*dmvnorm(dat,mu[1,],sig1) + 
+                                                          alpha[2]*dmvnorm(dat,mu[2,],sig2) + 
+                                                          alpha[3]*dmvnorm(dat,mu[3,],sig3) )
+  
+weights[1:1000,3]<-(alpha[3]*dmvnorm(dat,mu[3,],sig3)) / (alpha[1]*dmvnorm(dat,mu[1,],sig1) + 
+                                                          alpha[2]*dmvnorm(dat,mu[2,],sig2) + 
+                                                          alpha[3]*dmvnorm(dat,mu[3,],sig3) )
+
+ 
+#M-Step
+Nk <- colSums(weights)
+
+#new mixing parameter
+alpha2<-Nk/N
+
+#new mu
+mu2<-matrix(rep(0,6),nrow=3)
+mu2[1,]<- colSums(dat[1:1000,1:2]*weights[1:1000,1]) / Nk[1]
+mu2[2,]<- colSums(dat[1:1000,1:2]*weights[1:1000,2]) / Nk[2]
+mu2[3,]<- colSums(dat[1:1000,1:2]*weights[1:1000,3]) / Nk[3]
+
+#new covariance matrices
+cov1<-matrix(rep(0,4),nrow=2)
+cov2<-matrix(rep(0,4),nrow=2)
+cov3<-matrix(rep(0,4),nrow=2)
+
+#have to use loop to figure out covariance matrix
+for(i in 1:1000){
+  cov1<- cov1 + weights[i,1]*((dat[i,]-mu2[1,])%*%t((dat[i,]-mu2[1.])))
+  cov2<- cov2 + weights[i,2]*((dat[i,]-mu2[2,])%*%t((dat[i,]-mu2[2,])))
+  cov3<- cov3 + weights[i,3]*((dat[i,]-mu2[3,])%*%t((dat[i,]-mu2[3,])))
+}
+
+newsigma1<-cov1/Nk[1]
+newsigma2<-cov2/Nk[2]
+newsigma3<-cov3/Nk[3]
+
+counter<-0
+while(TRUE)
+{
+  #attain a new mu
+  mu<-mu2
+  
+  #attain new covariance matrices 
+  sig1<-newsigma1
+  sig2<-newsigma2
+  sig3<-newsigma3
+  
+  #get new mixing parameters
+  alpha<-alpha2
+
+  #LOOP IN WEIGHTS, E-STEP
+  #Evaluate log-likelihood/E-step
+  weights[1:1000,1]<-(alpha[1]*dmvnorm(dat,mu[1,],sig1)) / (alpha[1]*dmvnorm(dat,mu[1,],sig1) + 
+                                                            alpha[2]*dmvnorm(dat,mu[2,],sig2) + 
+                                                            alpha[3]*dmvnorm(dat,mu[3,],sig3) )
+  
+  weights[1:1000,2]<-(alpha[2]*dmvnorm(dat,mu[2,],sig2)) / (alpha[1]*dmvnorm(dat,mu[1,],sig1) + 
+                                                            alpha[2]*dmvnorm(dat,mu[2,],sig2) + 
+                                                            alpha[3]*dmvnorm(dat,mu[3,],sig3) )
+  
+  weights[1:1000,3]<-(alpha[3]*dmvnorm(dat,mu[3,],sig3)) / (alpha[1]*dmvnorm(dat,mu[1,],sig1) + 
+                                                            alpha[2]*dmvnorm(dat,mu[2,],sig2) + 
+                                                            alpha[3]*dmvnorm(dat,mu[3,],sig3) )
+
+  #LOOP IN M-Step
+  Nk <- colSums(weights) #New column sum of weights
+  alpha2<-Nk/N              #New mixing parameter
+
+  #new mu
+  mu2<-matrix(rep(0,6),nrow=3)
+  mu2[1,]<- colSums(dat*weights[1:1000,1]) / Nk[1]
+  mu2[2,]<- colSums(dat*weights[1:1000,2]) / Nk[2]
+  mu2[3,]<- colSums(dat*weights[1:1000,3]) / Nk[3]
+
+  #new covariance matrices
+  cov1<-matrix(rep(0,4),nrow=2)
+  cov2<-matrix(rep(0,4),nrow=2)
+  cov3<-matrix(rep(0,4),nrow=2)
+
+  for(i in 1:1000){
+    cov1<- cov1 + weights[i,1]*((dat[i,]-mu2[1,])%*%t((dat[i,]-mu2[1,])))
+    cov2<- cov2 + weights[i,2]*((dat[i,]-mu2[2,])%*%t((dat[i,]-mu2[2,])))
+    cov3<- cov3 + weights[i,3]*((dat[i,]-mu2[3,])%*%t((dat[i,]-mu2[3,])))
+  }
+  
+  newsigma1<-cov1/Nk[1]
+  newsigma2<-cov2/Nk[2]
+  newsigma3<-cov3/Nk[3]
+  
+  #count the number of iterations
+  counter<-counter+1
+  
+  #BREAK when convergence is reached
+  if(isTRUE(all.equal(newsigma1,sig1))| 
+     isTRUE(all.equal(newsigma2,sig2))| 
+     isTRUE(all.equal(newsigma3,sig3))| 
+     isTRUE(all.equal(mu2,mu))         ) break
+}
+```
